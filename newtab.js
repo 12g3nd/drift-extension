@@ -8,12 +8,50 @@
   const ctx = canvas.getContext('2d');
   const timeEl = document.getElementById('time');
   const dateEl = document.getElementById('date');
-  const moodEl = document.getElementById('mood');
+
+  const searchInput = document.getElementById('search-input');
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    const val = searchInput.value.trim();
+    if (!val) return;
+    const isUrl = /^(https?:\/\/|www\.)|(\.[a-z]{2,})(\/|$)/i.test(val);
+    if (isUrl) {
+      window.location.href = val.startsWith('http') ? val : 'https://' + val;
+    } else {
+      window.location.href = 'https://www.google.com/search?q=' + encodeURIComponent(val);
+    }
+  });
+
+  setTimeout(() => searchInput.focus(), 80);
+
+  const DEFAULT_LINKS = [
+    { label: 'Gmail',    url: 'https://mail.google.com',    icon: 'https://www.google.com/favicon.ico' },
+    { label: 'YouTube',  url: 'https://youtube.com',         icon: 'https://youtube.com/favicon.ico' },
+    { label: 'GitHub',   url: 'https://github.com',          icon: 'https://github.com/favicon.ico' },
+    { label: 'Maps',     url: 'https://maps.google.com',     icon: 'https://maps.google.com/favicon.ico' },
+    { label: 'Notion',   url: 'https://notion.so',           icon: 'https://notion.so/favicon.ico' },
+  ];
+
+  function renderQuickLinks(links) {
+    const container = document.getElementById('quick-links');
+    container.innerHTML = '';
+    for (const link of links) {
+      const a = document.createElement('a');
+      a.className = 'ql';
+      a.href = link.url;
+      a.innerHTML = `
+        <img class="ql-favicon" src="${link.icon}" alt="" onerror="this.style.display='none'">
+        ${link.label}
+      `;
+      container.appendChild(a);
+    }
+  }
+
+  renderQuickLinks(DEFAULT_LINKS);
 
   let W, H;
-  let calmScore = 70; // 0–100, loaded from storage
+  let calmScore = 70; 
 
-  // ─── RESIZE ───────────────────────────────────────────────
   function resize() {
     W = canvas.width = window.innerWidth;
     H = canvas.height = window.innerHeight;
@@ -21,7 +59,6 @@
   window.addEventListener('resize', resize);
   resize();
 
-  // ─── CALM SCORE ───────────────────────────────────────────
   function loadCalm() {
     chrome.storage.local.get(['calmScore'], (res) => {
       if (res.calmScore !== undefined) calmScore = res.calmScore;
@@ -30,7 +67,6 @@
   loadCalm();
   setInterval(loadCalm, 15000);
 
-  // ─── SEEDED RNG ───────────────────────────────────────────
   function makeRng(seed) {
     let s = seed >>> 0;
     return function () {
@@ -40,7 +76,6 @@
     };
   }
 
-  // ─── COLOR HELPERS ────────────────────────────────────────
   function lerp(a, b, t) { return a + (b - a) * t; }
 
   function lerpRgb(a, b, t) {
@@ -51,7 +86,6 @@
     return `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${a})`;
   }
 
-  // Apply calm modifier: low calm → desaturate + darken
   function applyCalm(rgb, calm) {
     const t = calm / 100;
     const avg = (rgb[0] + rgb[1] + rgb[2]) / 3;
@@ -60,13 +94,11 @@
     return [desat[0] * dark, desat[1] * dark, desat[2] * dark];
   }
 
-  // ─── TIME ─────────────────────────────────────────────────
   function getHours() {
     const n = new Date();
     return n.getHours() + n.getMinutes() / 60 + n.getSeconds() / 3600;
   }
 
-  // Sample a keyframe array (each item has .h plus color keys as [r,g,b])
   function sampleKf(kf, h) {
     const hh = h % 24;
     for (let i = 0; i < kf.length - 1; i++) {
@@ -82,7 +114,6 @@
     return kf[kf.length - 1];
   }
 
-  // Sky top/bottom gradient keyframes
   const SKY_KF = [
     { h: 0,    top: [5, 6, 22],       bot: [10, 10, 38] },
     { h: 4.5,  top: [8, 7, 30],       bot: [18, 12, 52] },
@@ -100,7 +131,6 @@
     { h: 24,   top: [5, 6, 22],       bot: [10, 10, 38] },
   ];
 
-  // Mountain color keyframes (far, mid, near)
   const MTN_KF = [
     { h: 0,    far: [18, 15, 45],  mid: [12, 10, 32],  near: [8, 8, 22] },
     { h: 5.5,  far: [38, 22, 75],  mid: [25, 15, 55],  near: [15, 10, 38] },
@@ -116,7 +146,6 @@
     { h: 24,   far: [18, 15, 45],  mid: [12, 10, 32],   near: [8, 8, 22] },
   ];
 
-  // Ground color keyframes
   const GND_KF = [
     { h: 0,    c: [6, 8, 18] },
     { h: 6,    c: [18, 14, 32] },
@@ -129,7 +158,6 @@
     { h: 24,   c: [6, 8, 18] },
   ];
 
-  // ─── TERRAIN GENERATION ───────────────────────────────────
   function makeMountainWaves(seed, count) {
     const r = makeRng(seed);
     const waves = [];
@@ -168,16 +196,15 @@
     ctx.fill();
   }
 
-  // ─── TREES ────────────────────────────────────────────────
   const TREES = [];
   {
     const r = makeRng(4004);
     for (let i = 0; i < 45; i++) {
       TREES.push({
-        nx: r(),                         // normalized x position
-        hFrac: r() * 0.065 + 0.032,     // height as fraction of H
+        nx: r(),                         
+        hFrac: r() * 0.065 + 0.032,     
         pine: r() > 0.38,
-        dx: r() * 28 - 14,              // slight x jitter
+        dx: r() * 28 - 14,         
       });
     }
     TREES.sort((a, b) => a.nx - b.nx);
@@ -196,7 +223,6 @@
       ctx.closePath();
       ctx.fill();
     }
-    // Trunk
     ctx.fillRect(x - w * 0.07, y, w * 0.14, h * 0.18);
   }
 
@@ -228,7 +254,6 @@
     }
   }
 
-  // ─── CLOUDS ───────────────────────────────────────────────
   const CLOUDS = [];
   {
     const r = makeRng(5005);
@@ -257,12 +282,10 @@
 
     ctx.fillStyle = rgba(base, op);
 
-    // Center puff
     ctx.beginPath();
     ctx.ellipse(cx, cy, sz * 0.65 * stormScale, sz * 0.38 * stormScale, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Surrounding puffs
     const r = makeRng((cloud.seed * 9999) | 0);
     for (let i = 0; i < cloud.puffs; i++) {
       const angle = (i / cloud.puffs) * Math.PI * 2;
@@ -275,7 +298,6 @@
     }
   }
 
-  // ─── RAIN ─────────────────────────────────────────────────
   const RAIN = [];
   for (let i = 0; i < 320; i++) {
     RAIN.push({
@@ -306,7 +328,6 @@
     ctx.restore();
   }
 
-  // ─── STARS ────────────────────────────────────────────────
   const STARS = [];
   {
     const r = makeRng(6006);
@@ -331,14 +352,12 @@
     }
   }
 
-  // ─── MOON ─────────────────────────────────────────────────
   function drawMoon(nightAmt, hours) {
     if (nightAmt < 0.15) return;
     const mx = 0.14 + Math.sin((hours - 21) * 0.18) * 0.07;
     const my = 0.08 + Math.abs(Math.sin((hours - 21) * 0.12)) * 0.04;
     const mr = Math.min(W, H) * 0.024;
 
-    // Glow
     const g = ctx.createRadialGradient(mx * W, my * H, mr * 0.5, mx * W, my * H, mr * 5);
     g.addColorStop(0, `rgba(255, 250, 215, ${nightAmt * 0.18})`);
     g.addColorStop(1, 'rgba(255, 250, 215, 0)');
@@ -347,14 +366,12 @@
     ctx.arc(mx * W, my * H, mr * 5, 0, Math.PI * 2);
     ctx.fill();
 
-    // Disk
     ctx.fillStyle = `rgba(255, 252, 228, ${nightAmt * 0.92})`;
     ctx.beginPath();
     ctx.arc(mx * W, my * H, mr, 0, Math.PI * 2);
     ctx.fill();
   }
 
-  // ─── SUN ──────────────────────────────────────────────────
   function drawSun(dayAmt, hours) {
     if (dayAmt < 0.08 || hours < 6.2 || hours > 19.8) return;
     const progress = (hours - 6.2) / (19.8 - 6.2);
@@ -362,7 +379,6 @@
     const sy = 0.06 + (0.5 - Math.sin(progress * Math.PI)) * 0.22;
     const sr = Math.min(W, H) * 0.028;
 
-    // Outer glow
     const g2 = ctx.createRadialGradient(sx * W, sy * H, sr, sx * W, sy * H, sr * 7);
     const isLow = sy > 0.18; // near horizon
     g2.addColorStop(0, `rgba(255, 235, 165, ${dayAmt * (isLow ? 0.35 : 0.22)})`);
@@ -373,14 +389,12 @@
     ctx.arc(sx * W, sy * H, sr * 7, 0, Math.PI * 2);
     ctx.fill();
 
-    // Disk
     ctx.fillStyle = `rgba(255, 248, 210, ${dayAmt * 0.95})`;
     ctx.beginPath();
     ctx.arc(sx * W, sy * H, sr, 0, Math.PI * 2);
     ctx.fill();
   }
 
-  // ─── FOG ──────────────────────────────────────────────────
   function drawFog(color, atY, storminess) {
     const op = 0.08 + storminess * 0.42;
     const g = ctx.createLinearGradient(0, atY - H * 0.10, 0, atY + H * 0.06);
@@ -391,9 +405,7 @@
     ctx.fillRect(0, atY - H * 0.10, W, H * 0.18);
   }
 
-  // ─── WATER SHEEN ──────────────────────────────────────────
   function drawWaterSheen(skyBot, groundY, t, calm) {
-    // Subtle reflective sheen on the ground area
     if (calm < 40) return; // hides in storms
     const op = ((calm - 40) / 60) * 0.12;
     const g = ctx.createLinearGradient(0, groundY, 0, groundY + H * 0.04);
@@ -403,7 +415,6 @@
     ctx.fillRect(0, groundY, W, H * 0.04);
   }
 
-  // ─── VIGNETTE ─────────────────────────────────────────────
   function drawVignette(storminess) {
     const op = 0.28 + storminess * 0.22;
     const g = ctx.createRadialGradient(W / 2, H * 0.55, H * 0.15, W / 2, H * 0.55, H);
@@ -413,26 +424,6 @@
     ctx.fillRect(0, 0, W, H);
   }
 
-  // ─── MOOD TEXT ────────────────────────────────────────────
-  const MOODS = [
-    { min: 85, label: 'Serene' },
-    { min: 70, label: 'Flowing' },
-    { min: 55, label: 'Drifting' },
-    { min: 40, label: 'Clouding' },
-    { min: 25, label: 'Stormy' },
-    { min: 0,  label: 'Turbulent' },
-  ];
-
-  function updateMood() {
-    for (const m of MOODS) {
-      if (calmScore >= m.min) {
-        moodEl.textContent = m.label;
-        break;
-      }
-    }
-  }
-
-  // ─── TIME UI ──────────────────────────────────────────────
   function updateTimeUI() {
     const now = new Date();
     const h = now.getHours();
@@ -445,19 +436,16 @@
     const MONTHS = ['January','February','March','April','May','June',
                     'July','August','September','October','November','December'];
     dateEl.textContent = `${DAYS[now.getDay()]}, ${MONTHS[now.getMonth()]} ${now.getDate()}`;
-    updateMood();
   }
   updateTimeUI();
   setInterval(updateTimeUI, 1000);
 
-  // ─── MAIN RENDER LOOP ─────────────────────────────────────
   function render(timestamp) {
     const t = timestamp || 0;
     const hours = getHours();
     const calm = calmScore;
-    const storminess = 1 - calm / 100; // 0 = calm, 1 = storm
+    const storminess = 1 - calm / 100; 
 
-    // Night/day amounts
     const nightAmt = hours < 6
       ? 1
       : hours < 7.5
@@ -469,7 +457,6 @@
             : 0;
     const dayAmt = 1 - nightAmt;
 
-    // Sample palettes
     const sky = sampleKf(SKY_KF, hours);
     const mtn = sampleKf(MTN_KF, hours);
     const gnd = sampleKf(GND_KF, hours);
@@ -482,38 +469,28 @@
     const gndCol  = applyCalm(gnd.c,    calm * 0.88);
     const fogCol  = lerpRgb([195, 208, 228], [140, 150, 162], storminess);
 
-    // ── Draw ──────────────────────────────────────────────
-
-    // 1. Sky gradient
     const skyGrd = ctx.createLinearGradient(0, 0, 0, H);
     skyGrd.addColorStop(0,    rgba(skyTop, 1));
     skyGrd.addColorStop(0.75, rgba(skyBot, 1));
     ctx.fillStyle = skyGrd;
     ctx.fillRect(0, 0, W, H);
 
-    // 2. Stars
     drawStars(nightAmt, t);
 
-    // 3. Celestial bodies
     drawMoon(nightAmt, hours);
     drawSun(dayAmt, hours);
 
-    // 4. Far mountains (~50% of H)
     const farBase  = H * 0.50;
     drawMountainLayer(FAR_WAVES,  farBase,  farCol,  t, 0.82);
 
-    // 5. Mid mountains (~60%)
     const midBase  = H * 0.60;
     drawMountainLayer(MID_WAVES,  midBase,  midCol,  t, 0.90);
 
-    // 6. Near hills (~70%)
     const nearBase = H * 0.70;
     drawMountainLayer(NEAR_WAVES, nearBase, nearCol, t, 1.00);
 
-    // 7. Trees on near hills
     drawTrees(NEAR_WAVES, nearBase, t, nearCol, calm);
 
-    // 8. Ground fill
     const groundY = mountainY(NEAR_WAVES, W / 2, nearBase, t) + 2;
     {
       const grdFill = ctx.createLinearGradient(0, groundY, 0, H);
@@ -524,25 +501,19 @@
       ctx.fillRect(0, groundY, W, H - groundY);
     }
 
-    // 9. Water sheen
     drawWaterSheen(skyBot, groundY, t, calm);
 
-    // 10. Fog at mountain base
     drawFog(fogCol, nearBase, storminess);
 
-    // 11. Clouds
     for (const cloud of CLOUDS) drawCloud(cloud, t, storminess);
 
-    // 12. Rain
     drawRain(storminess, t);
 
-    // 13. Storm overlay
     if (storminess > 0.5) {
       ctx.fillStyle = `rgba(20, 25, 42, ${(storminess - 0.5) * 0.38})`;
       ctx.fillRect(0, 0, W, H);
     }
 
-    // 14. Vignette
     drawVignette(storminess);
 
     requestAnimationFrame(render);
