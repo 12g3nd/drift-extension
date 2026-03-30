@@ -2,7 +2,7 @@
 A Chrome Extension 
 
 How it Works: 
-Every time you open a new tab, instead of a blank page or the standard dashboard of links, you'll see a living, slowly evolving landscape. It could be a foggy mountain range, a coastal cliffside, a quiet forest, or a desert at dusk. The scene is generative, meaning it's procedurally created, not a static photo.
+Every time you open a new tab, instead of a blank page or the standard dashboard of links, you'll see a living, slowly evolving landscape rendered from simple shapes. It could be a foggy mountain range, a coastal cliffside, a quiet forest, or a desert at dusk. The scene is generative, meaning it's procedurally created, not a static photo.
 
 Steps to Use:
 1. Download and unzip the file above (click the 'Download ZIP' button under the green 'Code' button)
