@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Drift",
-  "version": "1.0.0",
-  "description": "A living landscape that reflects your day. Calm focus brings clear skies. Distraction brings storms.",
+  "version": "1.0.1",
+  "description": "A living landscape that reflects your day (i.e. calm focus brings clear skies, distraction brings storms).",
   "chrome_url_overrides": {
     "newtab": "newtab.html"
   },
